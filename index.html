@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>塗装会社 顧客管理</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Hiragino Sans','Meiryo',sans-serif;background:#f5f5f5;color:#222;font-size:14px}
+.header{background:#185FA5;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:17px;font-weight:600}
+.header-right{display:flex;align-items:center;gap:10px;font-size:13px}
+.btn{padding:7px 14px;border:1px solid #ccc;border-radius:6px;font-size:13px;cursor:pointer;background:#fff;color:#222;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{background:#f0f0f0}
+.btn.primary{background:#185FA5;color:#fff;border-color:#185FA5}
+.btn.primary:hover{background:#0C447C}
+.btn.danger{color:#A32D2D;border-color:#A32D2D;background:#fff}
+.btn.danger:hover{background:#FCEBEB}
+.btn.sm{padding:4px 10px;font-size:12px}
+.container{max-width:1200px;margin:0 auto;padding:16px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #e0e0e0}
+.stat-num{font-size:22px;font-weight:600;line-height:1.2}
+.stat-label{font-size:12px;color:#666;margin-top:2px}
+.tabs{display:flex;gap:4px;margin-bottom:14px}
+.tab{padding:7px 16px;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;background:#fff;color:#666}
+.tab.active{background:#185FA5;color:#fff;border-color:#185FA5;font-weight:500}
+.search-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.search-bar input,.search-bar select{padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff;color:#222}
+.search-bar input{flex:1;min-width:150px}
+.split{display:grid;grid-template-columns:1fr 1.6fr;gap:14px}
+.customer-list{display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow-y:auto}
+.customer-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px 14px;cursor:pointer}
+.customer-card:hover{border-color:#185FA5}
+.customer-card.selected{border:2px solid #185FA5}
+.card-name{font-size:14px;font-weight:600;margin-bottom:4px}
+.card-sub{font-size:12px;color:#666;margin-top:2px}
+.badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.alert-badge{background:#FCEBEB;color:#A32D2D;font-size:11px;padding:2px 7px;border-radius:20px;font-weight:500}
+.panel{background:#fff;border:1px solid #ddd;border-radius:8px;padding:18px;max-height:80vh;overflow-y:auto}
+.panel-title{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field.full{grid-column:1/-1}
+.field label{font-size:11px;color:#666;font-weight:500}
+.field input,.field select,.field textarea{padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff;color:#222;width:100%}
+.field textarea{resize:vertical;min-height:60px}
+.section-title{font-size:12px;font-weight:600;color:#666;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid #eee}
+.log-item{padding:9px 12px;border-left:3px solid #ccc;margin-bottom:8px;background:#f9f9f9;border-radius:0 6px 6px 0}
+.log-item.call{border-left-color:#378ADD}
+.log-item.visit{border-left-color:#1D9E75}
+.log-item.mail{border-left-color:#7F77DD}
+.log-item.note{border-left-color:#888}
+.log-date{font-size:11px;color:#888}
+.log-content{font-size:13px;margin-top:3px;line-height:1.5}
+.log-author{font-size:11px;color:#888;margin-top:2px}
+.add-log-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.add-log-row input,.add-log-row select{padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px;background:#fff;color:#222}
+.progress-steps{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.step-pill{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500}
+.step-done{background:#185FA5;color:#fff}
+.step-current{background:#1D9E75;color:#fff}
+.step-todo{background:#eee;color:#888}
+.insp-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#f5f5f5;border-radius:6px;font-size:13px;margin-bottom:5px}
+.modal-wrap{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999}
+.modal{background:#fff;color:#111;border-radius:10px;padding:24px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #eee}
+.empty{text-align:center;padding:32px;color:#888;font-size:13px}
+.loading{text-align:center;padding:20px;color:#888}
+.toast{position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity 0.3s}
+.toast.show{opacity:1}
+@media(max-width:600px){.split{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏠 塗装会社 顧客管理</h1>
+  <div class="header-right">
+    <span id="user-email" style="font-size:12px;opacity:0.8"></span>
+    <button class="btn" style="background:rgba(255,255,255,0.2);color:#fff;border-color:rgba(255,255,255,0.4)" onclick="logout()">ログアウト</button>
+  </div>
+</div>
+
+<!-- ログイン画面 -->
+<div id="login-screen" style="display:none;min-height:100vh;background:#f5f5f5;align-items:center;justify-content:center">
+  <div style="background:#fff;padding:32px;border-radius:12px;width:360px;max-width:95vw;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+    <h2 style="font-size:18px;font-weight:600;margin-bottom:6px;text-align:center">塗装会社 顧客管理</h2>
+    <p style="font-size:13px;color:#888;text-align:center;margin-bottom:24px">スタッフの方はログインしてください</p>
+    <div class="field" style="margin-bottom:12px">
+      <label>メールアドレス</label>
+      <input type="email" id="login-email" placeholder="staff@example.com">
+    </div>
+    <div class="field" style="margin-bottom:20px">
+      <label>パスワード</label>
+      <input type="password" id="login-password" placeholder="パスワード">
+    </div>
+    <button class="btn primary" style="width:100%;justify-content:center;padding:10px" onclick="login()">ログイン</button>
+    <p id="login-error" style="color:#A32D2D;font-size:12px;margin-top:10px;text-align:center"></p>
+    <hr style="margin:20px 0;border:none;border-top:1px solid #eee">
+    <p style="font-size:12px;color:#888;text-align:center;margin-bottom:10px">初回登録はこちら</p>
+    <button class="btn" style="width:100%;justify-content:center" onclick="signup()">新規アカウント作成</button>
+  </div>
+</div>
+
+<!-- メイン画面 -->
+<div id="main-screen" style="display:none">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="tabs">
+        <button class="tab active" id="tab-list" onclick="switchTab('list')">顧客一覧</button>
+        <button class="tab" id="tab-insp" onclick="switchTab('insp')">点検アラート</button>
+      </div>
+      <button class="btn primary" onclick="openNew()">＋ 新規登録</button>
+    </div>
+
+    <div id="view-list">
+      <div class="stats-grid" id="stats"></div>
+      <div class="search-bar">
+        <input type="text" id="search" placeholder="名前・住所・電話で検索…" oninput="renderList()">
+        <select id="filterStatus" onchange="renderList()"><option value="">すべてのステータス</option></select>
+        <select id="filterStaff" onchange="renderList()"><option value="">すべての担当者</option></select>
+      </div>
+      <div class="split">
+        <div id="customer-list" class="customer-list"><div class="loading">読み込み中…</div></div>
+        <div id="detail-panel"><div class="empty">← 顧客を選択してください</div></div>
+      </div>
+    </div>
+
+    <div id="view-insp" style="display:none"><div id="insp-content"></div></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://fmpdzebpmeahemvfahmu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtcGR6ZWJwbWVhaGVtdmZhaG11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MzgyODIsImV4cCI6MjA5NDMxNDI4Mn0.RZReY0Xo0LCNMuqBkkxAv61QxrhNpXIzMMgZwrzcPjE';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STATUSES=['見込み','見積作成','見積提出済','成約済み','色決め完了','材料発注','工事発注','足場組立','塗装施工中','足場解体','完工','請求書作成','請求書発送','入金済','1年点検フォロー'];
+const STATUS_COLORS=['#D3D1C7','#B5D4F4','#85B7EB','#5DCAA5','#1D9E75','#FAC775','#EF9F27','#F0997B','#D85A30','#F4C0D1','#9FE1CB','#AFA9EC','#7F77DD','#534AB7','#0F6E56'];
+const STATUS_TEXT=['#444','#0C447C','#042C53','#085041','#04342C','#633806','#412402','#4A1B0C','#4A1B0C','#4B1528','#04342C','#26215C','#26215C','#26215C','#fff'];
+const LOG_TYPES={call:'電話',visit:'訪問',mail:'メール',note:'メモ'};
+
+let customers=[];
+let selectedId=null;
+let currentTab='list';
+
+sb.auth.onAuthStateChange((event,session)=>{
+  if(session){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('main-screen').style.display='block';
+    document.getElementById('user-email').textContent=session.user.email;
+    loadCustomers();
+  }else{
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('main-screen').style.display='none';
+  }
+});
+
+async function login(){
+  const email=document.getElementById('login-email').value;
+  const password=document.getElementById('login-password').value;
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error) document.getElementById('login-error').textContent='メールアドレスかパスワードが違います';
+}
+
+async function signup(){
+  const email=document.getElementById('login-email').value;
+  const password=document.getElementById('login-password').value;
+  if(!email||!password){alert('メールアドレスとパスワードを入力してください');return;}
+  const {error}=await sb.auth.signUp({email,password});
+  if(error) alert('エラー: '+error.message);
+  else alert('確認メールを送りました。メールのリンクをクリックして登録を完了してください。');
+}
+
+async function logout(){await sb.auth.signOut();}
+
+async function loadCustomers(){
+  const {data,error}=await sb.from('customers').select('*').order('created_at',{ascending:false});
+  if(error){showToast('データ読み込みエラー');return;}
+  customers=data||[];
+  render();
+}
+
+async function saveCustomer(data,id){
+  if(id){
+    const {error}=await sb.from('customers').update(data).eq('id',id);
+    if(error){showToast('保存エラー: '+error.message);return false;}
+  }else{
+    const {error}=await sb.from('customers').insert(data);
+    if(error){showToast('保存エラー: '+error.message);return false;}
+  }
+  showToast('保存しました');
+  await loadCustomers();
+  return true;
+}
+
+async function deleteCustomer(id){
+  const {error}=await sb.from('customers').delete().eq('id',id);
+  if(error){showToast('削除エラー');return;}
+  showToast('削除しました');
+  selectedId=null;
+  document.getElementById('detail-panel').innerHTML='<div class="empty">顧客を選択してください</div>';
+  await loadCustomers();
+}
+
+async function loadLogs(customerId){
+  const {data}=await sb.from('logs').select('*').eq('customer_id',customerId).order('log_date',{ascending:false});
+  return data||[];
+}
+
+async function addLog(customerId){
+  const text=document.getElementById('logText').value.trim();
+  if(!text)return;
+  const logData={customer_id:customerId,type:document.getElementById('logType').value,log_date:document.getElementById('logDate').value,text,author:document.getElementById('logAuthor').value||'—'};
+  const {error}=await sb.from('logs').insert(logData);
+  if(error){showToast('エラーが発生しました');return;}
+  showToast('記録を追加しました');
+  renderDetail(customerId);
+}
+
+function render(){renderStats();renderList();populateFilters();if(currentTab==='insp')renderInsp();}
+
+function populateFilters(){
+  const sf=document.getElementById('filterStatus');const cf=sf.value;
+  sf.innerHTML='<option value="">すべてのステータス</option>'+STATUSES.map(s=>`<option${cf===s?' selected':''}>${s}</option>`).join('');
+  const df=document.getElementById('filterStaff');const dc=df.value;
+  const staffs=[...new Set(customers.map(c=>c.staff).filter(Boolean))].sort();
+  df.innerHTML='<option value="">すべての担当者</option>'+staffs.map(s=>`<option${dc===s?' selected':''}>${s}</option>`).join('');
+}
+
+function statusBadge(s){
+  const i=STATUSES.indexOf(s);
+  return`<span class="badge" style="background:${STATUS_COLORS[i]||'#ddd'};color:${STATUS_TEXT[i]||'#444'}">${s}</span>`;
+}
+
+function renderStats(){
+  const today=new Date();const soon=new Date(today.getTime()+30*24*3600*1000);
+  const insp=customers.filter(c=>c.inspection_1y&&new Date(c.inspection_1y)<=soon&&c.status!=='1年点検フォロー').length;
+  const active=customers.filter(c=>['足場組立','塗装施工中','足場解体'].includes(c.status)).length;
+  const negot=customers.filter(c=>['見込み','見積作成','見積提出済'].includes(c.status)).length;
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-num">${customers.length}</div><div class="stat-label">総顧客数</div></div>
+    <div class="stat"><div class="stat-num" style="color:#185FA5">${negot}</div><div class="stat-label">商談中</div></div>
+    <div class="stat"><div class="stat-num" style="color:#1D9E75">${active}</div><div class="stat-label">施工中</div></div>
+    <div class="stat"><div class="stat-num" style="color:#A32D2D">${insp}</div><div class="stat-label">点検アラート</div></div>`;
+}
+
+function renderList(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const sf=document.getElementById('filterStatus').value;
+  const df=document.getElementById('filterStaff').value;
+  let list=customers.filter(c=>{
+    const m=!q||((c.name||'')+(c.addr||'')+(c.tel||'')).toLowerCase().includes(q);
+    return m&&(!sf||c.status===sf)&&(!df||c.staff===df);
+  });
+  const today=new Date();const soon=new Date(today.getTime()+30*24*3600*1000);
+  const el=document.getElementById('customer-list');
+  if(!list.length){el.innerHTML='<div class="empty">該当する顧客がいません</div>';return;}
+  el.innerHTML=list.map(c=>{
+    const needInsp=c.inspection_1y&&new Date(c.inspection_1y)<=soon&&c.status!=='1年点検フォロー';
+    return`<div class="customer-card${c.id===selectedId?' selected':''}" onclick="selectCustomer('${c.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="card-name">${c.name} 様 ${needInsp?'<span class="alert-badge">点検近い</span>':''}</div>
+          <div class="card-sub">📍 ${c.addr||'—'}</div>
+          <div class="card-sub">📞 ${c.tel||'—'} &nbsp; 担当: ${c.staff||'—'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">${statusBadge(c.status||'見込み')}<div class="card-sub" style="margin-top:4px">${c.const_date||'工事日未定'}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectCustomer(id){selectedId=id;renderList();renderDetail(id);}
+
+async function renderDetail(id){
+  const c=customers.find(x=>x.id===id);
+  if(!c)return;
+  const si=STATUSES.indexOf(c.status||'見込み');
+  const steps=STATUSES.map((s,i)=>`<span class="step-pill ${i<si?'step-done':i===si?'step-current':'step-todo'}">${s}</span>`).join('');
+  const logs=await loadLogs(id);
+  const logHtml=logs.map(l=>`
+    <div class="log-item ${l.type}">
+      <div class="log-date">${l.log_date} &nbsp;<span style="background:#eee;padding:1px 6px;border-radius:10px;font-size:11px">${LOG_TYPES[l.type]||l.type}</span></div>
+      <div class="log-content">${l.text}</div>
+      <div class="log-author">担当: ${l.author||'—'}</div>
+    </div>`).join('');
+  const amt=c.amount?Number(c.amount.replace(/,/g,'')):null;
+  document.getElementById('detail-panel').innerHTML=`
+    <div class="panel">
+      <div class="panel-title"><span>${c.name} 様</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm" onclick="openEdit('${c.id}')">✏️ 編集</button>
+          <button class="btn sm danger" onclick="if(confirm('削除しますか？'))deleteCustomer('${c.id}')">🗑</button>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:#666;margin-bottom:5px">進捗ステータス</div>
+        <div class="progress-steps">${steps}</div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:#666;font-weight:500">ステータスを変更</label>
+        <select onchange="changeStatus('${c.id}',this.value)" style="display:block;margin-top:4px;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;width:100%">
+          ${STATUSES.map(s=>`<option${(c.status||'見込み')===s?' selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-grid">
+        <div class="field"><label>住所</label><div style="font-size:13px">${c.addr||'—'}</div></div>
+        <div class="field"><label>電話番号</label><div style="font-size:13px">${c.tel||'—'}</div></div>
+        <div class="field"><label>メール</label><div style="font-size:13px">${c.email||'—'}</div></div>
+        <div class="field"><label>担当者</label><div style="font-size:13px">${c.staff||'—'}</div></div>
+        <div class="field"><label>工事日</label><div style="font-size:13px">${c.const_date||'未定'}</div></div>
+        <div class="field"><label>金額</label><div style="font-size:13px">${amt?amt.toLocaleString()+'円':'—'}</div></div>
+        <div class="field full"><label>工事内容・備考</label><div style="font-size:13px;line-height:1.6">${c.content||'—'}</div></div>
+      </div>
+      <div class="section-title">点検予定</div>
+      <div class="insp-row">1年点検<span style="font-weight:600">${c.inspection_1y||'未設定'}</span></div>
+      <div class="insp-row">3年点検<span style="font-weight:600">${c.inspection_3y||'未設定'}</span></div>
+      <div class="section-title">やり取り履歴</div>
+      <div class="add-log-row">
+        <select id="logType"><option value="call">電話</option><option value="visit">訪問</option><option value="mail">メール</option><option value="note">メモ</option></select>
+        <input type="date" id="logDate" value="${new Date().toISOString().slice(0,10)}" style="width:130px">
+        <input type="text" id="logAuthor" placeholder="担当者名" style="width:80px">
+        <input type="text" id="logText" placeholder="内容を入力…" style="flex:1;min-width:120px">
+        <button class="btn primary sm" onclick="addLog('${c.id}')">＋追加</button>
+      </div>
+      <div style="margin-top:10px">${logHtml||'<div class="empty" style="padding:16px">記録がありません</div>'}</div>
+    </div>`;
+}
+
+async function changeStatus(id,val){
+  await sb.from('customers').update({status:val}).eq('id',id);
+  showToast('ステータスを更新しました');
+  await loadCustomers();
+  renderDetail(id);
+}
+
+function renderInsp(){
+  const today=new Date();const soon=new Date(today.getTime()+90*24*3600*1000);
+  const overdue=customers.filter(c=>c.inspection_1y&&new Date(c.inspection_1y)<today&&c.status!=='1年点検フォロー');
+  const upcoming=customers.filter(c=>c.inspection_1y&&new Date(c.inspection_1y)>=today&&new Date(c.inspection_1y)<=soon&&c.status!=='1年点検フォロー');
+  let html='';
+  if(overdue.length){html+=`<div class="section-title" style="color:#A32D2D">⚠️ 期限超過 (${overdue.length}件)</div>`;html+=overdue.map(c=>inspRow(c,'danger')).join('');}
+  if(upcoming.length){html+=`<div class="section-title" style="color:#633806">🔔 90日以内の点検 (${upcoming.length}件)</div>`;html+=upcoming.map(c=>inspRow(c,'warn')).join('');}
+  if(!overdue.length&&!upcoming.length)html='<div class="empty">直近の点検アラートはありません</div>';
+  document.getElementById('insp-content').innerHTML=html;
+}
+
+function inspRow(c,type){
+  const bg=type==='danger'?'#FCEBEB':'#FAEEDA';const cl=type==='danger'?'#A32D2D':'#633806';
+  return`<div style="background:${bg};border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="switchTab('list');selectCustomer('${c.id}')">
+    <div style="display:flex;justify-content:space-between"><span style="font-weight:600">${c.name} 様</span><span style="color:${cl};font-weight:600">1年点検: ${c.inspection_1y}</span></div>
+    <div style="font-size:12px;color:#666;margin-top:3px">${c.addr||'—'} / 担当: ${c.staff||'—'}</div>
+  </div>`;
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  ['list','insp'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('view-'+t).style.display=t===tab?'block':'none';
+  });
+  if(tab==='insp')renderInsp();
+}
+
+function openNew(){showModal();}
+function openEdit(id){showModal(customers.find(x=>x.id===id));}
+
+function showModal(c){
+  const isEdit=!!c;
+  document.getElementById('modal-root').innerHTML=`<div class="modal-wrap" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-title">${isEdit?'顧客情報を編集':'新規顧客登録'}
+        <button onclick="closeModal()" style="background:none;border:none;cursor:pointer;font-size:22px;color:#666">×</button>
+      </div>
+      <div class="field-grid">
+        <div class="field full"><label>お名前 *</label><input id="f-name" value="${c?esc(c.name):''}" placeholder="山田 太郎"></div>
+        <div class="field full"><label>住所</label><input id="f-addr" value="${c?esc(c.addr):''}" placeholder="三重県津市…"></div>
+        <div class="field"><label>電話番号</label><input id="f-tel" value="${c?esc(c.tel):''}" placeholder="059-000-0000"></div>
+        <div class="field"><label>メールアドレス</label><input id="f-email" value="${c?esc(c.email):''}" placeholder="sample@example.com"></div>
+        <div class="field"><label>担当者</label><input id="f-staff" value="${c?esc(c.staff):''}" placeholder="田中"></div>
+        <div class="field"><label>ステータス</label><select id="f-status">${STATUSES.map(s=>`<option${c&&c.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
+        <div class="field"><label>工事日</label><input type="date" id="f-date" value="${c?c.const_date:''}"></div>
+        <div class="field"><label>金額（円）</label><input id="f-amount" value="${c?esc(c.amount):''}" placeholder="850000"></div>
+        <div class="field full"><label>工事内容・備考</label><textarea id="f-content">${c?esc(c.content):''}</textarea></div>
+        <div class="field"><label>1年点検予定日</label><input type="date" id="f-insp1" value="${c?c.inspection_1y:''}"></div>
+        <div class="field"><label>3年点検予定日</label><input type="date" id="f-insp3" value="${c?c.inspection_3y:''}"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="closeModal()">キャンセル</button>
+        <button class="btn primary" onclick="saveCust('${isEdit?c.id:''}')">${isEdit?'更新する':'登録する'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function closeModal(){document.getElementById('modal-root').innerHTML='';}
+
+async function saveCust(id){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('名前を入力してください');return;}
+  const data={name,addr:document.getElementById('f-addr').value,tel:document.getElementById('f-tel').value,
+    email:document.getElementById('f-email').value,staff:document.getElementById('f-staff').value,
+    status:document.getElementById('f-status').value,const_date:document.getElementById('f-date').value||null,
+    amount:document.getElementById('f-amount').value,content:document.getElementById('f-content').value,
+    inspection_1y:document.getElementById('f-insp1').value||null,inspection_3y:document.getElementById('f-insp3').value||null};
+  const ok=await saveCustomer(data,id||null);
+  if(ok)closeModal();
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
